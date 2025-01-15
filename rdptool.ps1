@@ -294,7 +294,7 @@ $applyRegistryButton.Add_Click({
                 $controls[$key].Yes.Checked = ($settings[$key] -eq "1")
                 $controls[$key].No.Checked = ($settings[$key] -eq "0")
             } else {
-                $controls[$key].Text = $settings[$key]
+                $controls[$key] = $settings[$key]
             }
         }
     }

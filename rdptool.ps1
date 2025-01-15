@@ -331,7 +331,7 @@ $saveButton.Add_Click({
             }
         } else {
             # Handle non-binary values
-            $settings[$key] = $controls[$key].Text
+            $settings[$key] = $controls[$key]
         }
     } 
     $selectedResolution = $resolutionComboBox.SelectedItem -split "x"

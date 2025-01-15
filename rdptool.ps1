@@ -3,18 +3,23 @@ param (
     [string]$RdpFilePath
 )
 
+# Benötigte PowerShell-Version
 #requires -Version 5.1
+
+# Einbinden von .NET Assemblies für GUI-Komponenten
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Initialisieren des HashTables für Registry-Einstellungen
 $regsettings = @{}
 
-
+# Überprüfen, ob der Pfad zur RDP-Datei angegeben wurde
 if (-Not $RdpFilePath) {
     Write-Host "Bitte eine RDP-Datei angeben." -ForegroundColor Red
     return
 }
 
+# Überprüfen, ob die angegebene RDP-Datei existiert
 if (-Not (Test-Path $RdpFilePath)) {
     Write-Host "Die angegebene Datei wurde nicht gefunden: $RdpFilePath" -ForegroundColor Red
     return
@@ -24,11 +29,13 @@ if (-Not (Test-Path $RdpFilePath)) {
 function Load-RdpFile {
     param ([string]$FilePath)
 
+    # Überprüfen, ob die Datei existiert
     if (-Not (Test-Path $FilePath)) {
         Write-Host "Die Datei wurde nicht gefunden: $FilePath" -ForegroundColor Red
         return $null
     }
 
+    # Laden des Datei-Inhalts und Parsen der Einstellungen
     $content = Get-Content -Path $FilePath
     $settings = @{}
 
@@ -49,10 +56,12 @@ function Save-RdpFile {
         [hashtable]$Settings
     )
 
+    # Laden des Datei-Inhalts
     $content = Get-Content -Path $FilePath
     $updatedContent = @()
     $updatedKeys = @{}
 
+    # Aktualisieren der Einstellungen im Datei-Inhalt
     foreach ($line in $content) {
         if ($line -match "^(?<key>.+?):(?<value1>.+):(?<value>.+)") {
             $key = $matches.key
@@ -63,27 +72,26 @@ function Save-RdpFile {
                     $updatedContent += "$($key):$($value1):$($Settings[$key+":"+$value1])"
                     $updatedKeys[$key+":"+$value1] = $true
                 } else {
-                $updatedContent += $line
-                $updatedKeys[$key+":"+$value1] = $true
+                    $updatedContent += $line
+                    $updatedKeys[$key+":"+$value1] = $true
                 }
             } else {
-            $updatedContent += $line
-            $updatedKeys[$key+":"+$value1] = $true
+                $updatedContent += $line
+                $updatedKeys[$key+":"+$value1] = $true
             }
         } else {
             $updatedContent += $line
         }
-
-
     }
 
-
+    # Hinzufügen neuer Einstellungen, die noch nicht im Datei-Inhalt sind
     foreach ($key in $Settings.Keys) {
         if (-Not $updatedKeys.ContainsKey($key)) {
             $updatedContent += "$($key):$($Settings[$key])"
         }
     }
 
+    # Speichern des aktualisierten Datei-Inhalts
     Set-Content -Path $FilePath1 -Value $updatedContent -Force
 }
 
@@ -91,15 +99,18 @@ function Save-RdpFile {
 function Save-ConfigToRegistry {
     param ([hashtable]$Settings)
 
+    # Pfad zum Registry-Schlüssel
     $regKeyPath = "HKCU:\Software\ABXRDPConfig"
     if (-Not (Test-Path $regKeyPath)) {
         New-Item -Path $regKeyPath -Force | Out-Null
     }
 
+    # Speichern der Einstellungen in der Registry
     foreach ($key in $Settings.Keys) {
         Set-ItemProperty -Path $regKeyPath -Name $key -Value $Settings[$key]
     }
 
+    # Anzeigen einer Erfolgsmeldung
     [System.Windows.Forms.MessageBox]::Show("Konfiguration erfolgreich in der Registry gespeichert!", "Erfolg")
 }
 
@@ -107,9 +118,11 @@ function Save-ConfigToRegistry {
 function Load-ConfigFromRegistry {
     param ()
 
+    # Pfad zum Registry-Schlüssel
     $regKeyPath = "HKCU:\Software\ABXRDPConfig"
     $settings = @{}
 
+    # Laden der Einstellungen aus der Registry
     if (Test-Path $regKeyPath) {
         $properties = Get-ItemProperty -Path $regKeyPath
         foreach ($property in $properties.PSObject.Properties) {
@@ -132,7 +145,6 @@ $defaultSettings = @{
     "dynamic resolution:i" = "1"  # Passt die Auflösung dynamisch an
     "desktopwidth:i:" ="1600"  # Setzt die Desktopbreite in Pixeln
     "desktopheight:i:" = "960"  # Setzt die Desktophöhe in Pixeln
-
 }
 
 # Übliche Bildschirmgrößen (kann im File konfiguriert werden)
@@ -147,27 +159,25 @@ $screenResolutions = @(
     "3840x2160"
 )
 
-
+# Laden der Einstellungen aus der RDP-Datei oder Verwendung der Standardwerte
 $settings = Load-RdpFile -FilePath $RdpFilePath
 
 if (-Not $settings) {
     $settings = $defaultSettings
 }
 
-# GUI erstellen
+# Erstellen der GUI
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "RDP-Einstellungen anpassen"
 $form.Size = New-Object System.Drawing.Size(600, 500)
 
 $y = 10
 
+# Initialisieren der Steuerelemente
 $controls = @{}
 
-
-
-
+# Hinzufügen der Steuerelemente für die Einstellungen
 foreach ($key in $defaultSettings.Keys) {
-   
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "" + @{
         "use multimon:i" = "Verwende mehrere Monitore"
@@ -183,7 +193,7 @@ foreach ($key in $defaultSettings.Keys) {
     $form.Controls.Add($label)
 
     if ($defaultSettings[$key] -match "^[01]$") {
-        # Use radio buttons for binary values
+        # Verwenden von Radiobuttons für binäre Werte
         $panel = New-Object System.Windows.Forms.Panel
         $panel.Location = New-Object System.Drawing.Point(270, $y)
         $panel.Size = New-Object System.Drawing.Size(300, 30)
@@ -206,6 +216,7 @@ foreach ($key in $defaultSettings.Keys) {
             "No" = $radioNo
         }
     } elseif ($key -eq "screenResolutions:i") {
+        # Verwenden eines ComboBox für Bildschirmauflösungen
         $resolutionComboBox = New-Object System.Windows.Forms.ComboBox
         $resolutionComboBox.Location = New-Object System.Drawing.Point(270, $y)
         $resolutionComboBox.Size = New-Object System.Drawing.Size(300, 20)
@@ -219,7 +230,7 @@ foreach ($key in $defaultSettings.Keys) {
         # Skip width and height for now, add combo box later
         
     } else {
-        # Use a text box for non-binary values
+        # Verwenden eines TextBox für nicht-binäre Werte
         $textBox = New-Object System.Windows.Forms.TextBox
         $textBox.Text = if ($settings[$key] -ne $null) { $settings[$key] } else { $defaultSettings[$key] }
         $textBox.Location = New-Object System.Drawing.Point(270, $y)
@@ -230,10 +241,7 @@ foreach ($key in $defaultSettings.Keys) {
     }
 
     $y += 30
-
 }
-
-
 
 $y += 40
 
@@ -244,11 +252,11 @@ $tempDirectory = [System.IO.Path]::GetTempPath()
 $tempFileName = [System.IO.Path]::GetFileName($RdpFilePath)
 $RdpFilePath1 = Join-Path -Path $tempDirectory -ChildPath $tempFileName
 
+# Hinzufügen des Buttons zum Speichern in die Registry
 $saveRegistryButton = New-Object System.Windows.Forms.Button
 $saveRegistryButton.Text = "In Registry speichern"
 $saveRegistryButton.Location = New-Object System.Drawing.Point(10, $y)
 $saveRegistryButton.Add_Click({
-    
     $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
     $settings["desktopwidth:i"] = $selectedResolution[0]
     $settings["desktopheight:i"] = $selectedResolution[1]
@@ -266,13 +274,13 @@ $saveRegistryButton.Add_Click({
             if ( $key -eq "desktopheight:i:") {
                 $regsettings[$key] = $settings["desktopheight:i"]
             }
-
         }
     }
     Save-ConfigToRegistry -Settings $regsettings
 })
 $form.Controls.Add($saveRegistryButton)
 
+# Hinzufügen des Buttons zum Anwenden der Einstellungen aus der Registry
 $applyRegistryButton = New-Object System.Windows.Forms.Button
 $applyRegistryButton.Text = "Aus Registry anwenden"
 $applyRegistryButton.Location = New-Object System.Drawing.Point(150, $y)
@@ -287,7 +295,6 @@ $applyRegistryButton.Add_Click({
 
     $resolutionComboBox.SelectedItem = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
 
-    
     foreach ($key in $settings.Keys) {
         if ($controls.ContainsKey($key)) {
             if ($controls[$key] -is [System.Collections.Hashtable]) {
@@ -303,7 +310,7 @@ $form.Controls.Add($applyRegistryButton)
 
 $y += 40
 
-
+# Hinzufügen des Buttons zum Speichern der Einstellungen
 $saveButton = New-Object System.Windows.Forms.Button
 $saveButton.Text = "Speichern"
 $saveButton.Location = New-Object System.Drawing.Point(10, $y)
@@ -326,12 +333,12 @@ $saveButton.Add_Click({
     $settings["desktopheight:i"] = $selectedResolution[1]
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
- #   [System.Windows.Forms.MessageBox]::Show("Einstellungen gespeichert!", "Erfolg")
+    # [System.Windows.Forms.MessageBox]::Show("Einstellungen gespeichert!", "Erfolg")
     $form.Close()
 })
 $form.Controls.Add($saveButton)
 
-# Add Start Button
+# Hinzufügen des Buttons zum Starten der RDP-Verbindung
 $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Starten"
 $startButton.Location = New-Object System.Drawing.Point(100, $y)
@@ -356,11 +363,11 @@ $startButton.Add_Click({
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
     Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
-#    [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet!", "Erfolg")
+    # [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet!", "Erfolg")
     $form.Close()
 })
 $form.Controls.Add($startButton)
 $form.AcceptButton = $startButton
 
-
+# Anzeigen des Formulars
 $form.ShowDialog()

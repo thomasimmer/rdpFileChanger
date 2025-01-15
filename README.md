@@ -69,8 +69,4 @@ signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 /f "C:\
 ```
 
 ## Mögliche Erweiterungen
-1. **Unterstützung für mehrere Sprachen:** Übersetzen der GUI in andere Sprachen.
-2. **Weitere RDP-Einstellungen:** Hinzufügen zusätzlicher Felder für erweiterte Konfigurationen.
-3. **Log-System:** Speichern von Änderungen in einer Protokolldatei.
-4. **Benutzerrechte:** Verwaltung der Berechtigungen für das Speichern und Anwenden von Konfigurationen.
-5. **Automatische Updates:** Hinzufügen eines Systems zur automatischen Aktualisierung des Tools.
+1. Fehlerkontrollen

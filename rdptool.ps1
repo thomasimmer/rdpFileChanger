@@ -239,17 +239,10 @@ $y += 40
 
 $insertText = "user_"
 
-# Datei- und Verzeichnisinformationen extrahieren
-$directory = Split-Path $RdpFilePath
-$filename = [System.IO.Path]::GetFileNameWithoutExtension($RdpFilePath)
-$extension = [System.IO.Path]::GetExtension($RdpFilePath)
-
-# Neuen Dateinamen erstellen
-$newFilename = "$insertText$filename$extension"
-
-# Neuer vollständiger Pfad
-$RdpFilePath1 = Join-Path -Path $directory -ChildPath $newFilename
-$RdpFilePath1
+# System-Temp-Verzeichnis und Dateiname festlegen
+$tempDirectory = [System.IO.Path]::GetTempPath()
+$tempFileName = [System.IO.Path]::GetFileName($RdpFilePath)
+$RdpFilePath1 = Join-Path -Path $tempDirectory -ChildPath $tempFileName
 
 $saveRegistryButton = New-Object System.Windows.Forms.Button
 $saveRegistryButton.Text = "In Registry speichern"

@@ -402,7 +402,7 @@ $settings = @{}
     $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
-    #Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
+    Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
     # [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet!", "Erfolg")
     $form.Close()
 })

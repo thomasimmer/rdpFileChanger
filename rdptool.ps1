@@ -140,6 +140,60 @@ function Load-ConfigFromRegistry {
     return $settings
 }
 
+function get-settings-from-gui {
+    param ([hashtable]$controls1) 
+
+$settings = @{}
+
+
+    foreach ($key in $controls1.Keys) {
+        if ($controls1[$key] -is [System.Collections.Hashtable]) {
+            # Handle binary values
+            if ($controls1[$key].Yes.Checked) {
+                $settings[$key] = "1"
+            } elseif ($controls1[$key].No.Checked) {
+                $settings[$key] = "0"
+            }
+        } elseif ($key -eq "screenResolutions:i") {
+            $settings[$key] =  $resolutionComboBox.SelectedItem 
+            $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
+            $settings["desktopwidth:i"] = $selectedResolution[0]
+            $settings["desktopheight:i"] = $selectedResolution[1]
+        } elseif ($key -eq "desktopwidth:i") {
+        } elseif ($key -eq "desktopheight:i") {
+        } else {
+        # Handle non-binary values
+        $settings[$key] = $controls1[$key].Text
+        }   
+    }
+  
+    return $Settings
+
+}
+
+
+function set-gui-from-settings {
+    param ([hashtable]$mysettings) 
+
+    $resolutionComboBox.Text = "$($mysettings["desktopwidth:i"])x$($mysettings["desktopheight:i"])"
+
+    foreach ($key in $defaultSettings.Keys) {
+        if ($controls.ContainsKey($key)) {
+            if ($controls.ContainsKey($key)) {
+                if ($controls[$key] -is [System.Collections.Hashtable]) {
+                    $controls[$key].Yes.Checked = ($mysettings[$key] -eq "1")
+                    $controls[$key].No.Checked = ($mysettings[$key] -eq "0")
+                } else {
+                    $controls[$key].Text = $mysettings[$key]
+                }
+            }
+        }
+    }
+
+ 
+}
+
+
 # Initiale Einstellungen (Defaults)
 $defaultSettings = @{
     "use multimon:i" = "0"  # Ermöglicht die Verwendung mehrerer Monitore
@@ -198,7 +252,17 @@ foreach ($key in $defaultSettings.Keys) {
     $label.Size = New-Object System.Drawing.Size(250, 20)
     $form.Controls.Add($label)
 
-    if ($defaultSettings[$key] -match "^[01]$") {
+    if ($key -eq "screen mode id:i") {
+        # Verwenden eines TextBox für nicht-binäre Werte
+        $textBox = New-Object System.Windows.Forms.TextBox
+        $textBox.Text = if ($settings[$key] -ne $null) { $settings[$key] } else { $defaultSettings[$key] }
+        $textBox.Location = New-Object System.Drawing.Point(270, $y)
+        $textBox.Size = New-Object System.Drawing.Size(300, 20)
+        $form.Controls.Add($textBox)
+
+        $controls[$key] = $textBox
+
+    } elseif ($defaultSettings[$key] -match "^[01]$") {
         # Verwenden von Radiobuttons für binäre Werte
         $panel = New-Object System.Windows.Forms.Panel
         $panel.Location = New-Object System.Drawing.Point(270, $y)
@@ -230,7 +294,7 @@ foreach ($key in $defaultSettings.Keys) {
         $resolutionComboBox.Items.AddRange($screenResolutions)
         $resolutionComboBox.SelectedItem = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
         $form.Controls.Add($resolutionComboBox)    
-        $controls[$key] = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
+        $controls[$key] = $resolutionComboBox
     
     }  elseif ($key -eq "desktopwidth:i:" -or $key -eq "desktopheight:i:" ) {
         # Skip width and height for now, add combo box later
@@ -263,27 +327,12 @@ $saveRegistryButton = New-Object System.Windows.Forms.Button
 $saveRegistryButton.Text = "In Registry speichern"
 $saveRegistryButton.Location = New-Object System.Drawing.Point(10, $y)
 $saveRegistryButton.Add_Click({
-    $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
-    $settings["desktopwidth:i"] = $selectedResolution[0]
-    $settings["desktopheight:i"] = $selectedResolution[1]
-    
-    foreach ($key in $defaultSettings.Keys) {
-        if ($controls[$key] -is [System.Collections.Hashtable]) {
-            $regsettings[$key] = if ($controls[$key].Yes.Checked) { "1" } else { "0" }
-        } else {
-            if ($key -eq "screenResolutions:i") {
-                $regsettings[$key] = $resolutionComboBox.SelectedItem
-            }
-            if ($key -eq "desktopwidth:i:" ) {
-                $regsettings[$key] =  $settings["desktopwidth:i"]
-            }
-            if ( $key -eq "desktopheight:i:") {
-                $regsettings[$key] = $settings["desktopheight:i"]
-            }
-        }
-    }
+
+    $regsettings = get-settings-from-gui($controls)
+
     Save-ConfigToRegistry -Settings $regsettings
 })
+
 $form.Controls.Add($saveRegistryButton)
 
 # Hinzufügen des Buttons zum Anwenden der Einstellungen aus der Registry
@@ -299,19 +348,10 @@ $applyRegistryButton.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("Keine gespeicherte Konfiguration gefunden. Standardwerte werden angewendet.", "Hinweis")
     }
 
-    $resolutionComboBox.SelectedItem = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
+    set-gui-from-settings($settings)
 
-    foreach ($key in $settings.Keys) {
-        if ($controls.ContainsKey($key)) {
-            if ($controls[$key] -is [System.Collections.Hashtable]) {
-                $controls[$key].Yes.Checked = ($settings[$key] -eq "1")
-                $controls[$key].No.Checked = ($settings[$key] -eq "0")
-            } else {
-                $controls[$key] = $settings[$key]
-            }
-        }
-    }
 })
+
 $form.Controls.Add($applyRegistryButton)
 
 $y += 40
@@ -321,27 +361,14 @@ $saveButton = New-Object System.Windows.Forms.Button
 $saveButton.Text = "Speichern"
 $saveButton.Location = New-Object System.Drawing.Point(10, $y)
 $saveButton.Add_Click({
-    foreach ($key in $controls.Keys) {
-        if ($controls[$key] -is [System.Collections.Hashtable]) {
-            # Handle binary values
-            if ($controls[$key].Yes.Checked) {
-                $settings[$key] = "1"
-            } elseif ($controls[$key].No.Checked) {
-                $settings[$key] = "0"
-            }
-        } else {
-            # Handle non-binary values
-            $settings[$key] = $controls[$key]
-        }
-    } 
-    $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
-    $settings["desktopwidth:i"] = $selectedResolution[0]
-    $settings["desktopheight:i"] = $selectedResolution[1]
+
+    $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
     # [System.Windows.Forms.MessageBox]::Show("Einstellungen gespeichert!", "Erfolg")
     $form.Close()
 })
+
 $form.Controls.Add($saveButton)
 
 # Hinzufügen des Buttons zum Starten der RDP-Verbindung
@@ -349,26 +376,33 @@ $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Starten"
 $startButton.Location = New-Object System.Drawing.Point(100, $y)
 $startButton.Add_Click({
-    foreach ($key in $controls.Keys) {
-        if ($controls[$key] -is [System.Collections.Hashtable]) {
-            # Handle binary values
-            if ($controls[$key].Yes.Checked) {
-                $settings[$key] = "1"
-            } elseif ($controls[$key].No.Checked) {
-                $settings[$key] = "0"
-            }
-        } else {
-            # Handle non-binary values
-            $settings[$key] = $controls[$key].Text
-        }
-    }
+#    foreach ($key in $controls.Keys) {
+#        if ($controls[$key] -is [System.Collections.Hashtable]) {
+#            # Handle binary values
+#            if ($controls[$key].Yes.Checked) {
+#                $settings[$key] = "1"
+#            } elseif ($controls[$key].No.Checked) {
+#                $settings[$key] = "0"
+#            }
+#        } else {
+#            # Handle non-binary values
+#            $settings[$key] = $controls[$key].Text
+##        }
+#    }
 
-    $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
-    $settings["desktopwidth:i"] = $selectedResolution[0]
-    $settings["desktopheight:i"] = $selectedResolution[1]
+    
+
+#    $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
+#    $settings["desktopwidth:i"] = $selectedResolution[0]
+#    $settings["desktopheight:i"] = $selectedResolution[1]
+
+$settings = @{}
+
+
+    $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
-    Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
+    #Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
     # [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet!", "Erfolg")
     $form.Close()
 })

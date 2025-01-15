@@ -1,3 +1,8 @@
+# This script provides a graphical user interface (GUI) to modify and save RDP (Remote Desktop Protocol) file settings.
+# It allows users to load an RDP file, adjust settings, save the updated file, and store/load configurations from the Windows registry.
+# To convert this script to an executable, use a tool like `ps2exe`:
+# Example: ps2exe.ps1 -inputFile rdptool.ps1 -outputFile rdptool.exe
+
 # Pfad zur RDP-Datei aus Argumenten
 param (
     [string]$RdpFilePath

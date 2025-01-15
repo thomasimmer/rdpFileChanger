@@ -150,6 +150,7 @@ $defaultSettings = @{
     "dynamic resolution:i" = "1"  # Passt die Auflösung dynamisch an
     "desktopwidth:i:" ="1600"  # Setzt die Desktopbreite in Pixeln
     "desktopheight:i:" = "960"  # Setzt die Desktophöhe in Pixeln
+    "screen mode id:i" = "2"  # Setzt den Bildschirmmodus (2 = Vollbild)
 }
 
 # Übliche Bildschirmgrößen (kann im File konfiguriert werden)
@@ -231,7 +232,7 @@ foreach ($key in $defaultSettings.Keys) {
         $form.Controls.Add($resolutionComboBox)    
         $controls[$key] = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
     
-    }  elseif ($key -eq "desktopwidth:i:" -or $key -eq "desktopheight:i:") {
+    }  elseif ($key -eq "desktopwidth:i:" -or $key -eq "desktopheight:i:" ) {
         # Skip width and height for now, add combo box later
         
     } else {

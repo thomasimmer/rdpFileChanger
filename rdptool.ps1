@@ -1,7 +1,7 @@
 # This script provides a graphical user interface (GUI) to modify and save RDP (Remote Desktop Protocol) file settings.
 # It allows users to load an RDP file, adjust settings, save the updated file, and store/load configurations from the Windows registry.
 # To convert this script to an executable, use a tool like `ps2exe`:
-# Example: ps2exe.ps1 -inputFile rdptool.ps1 -outputFile rdptool.exe
+# Example: ps2exe.ps1 -inputFile rdptool.ps1 -outputFile rdptool.exe -noConsole
 
 # Pfad zur RDP-Datei aus Argumenten
 param (
@@ -20,13 +20,13 @@ $regsettings = @{}
 
 # Überprüfen, ob der Pfad zur RDP-Datei angegeben wurde
 if (-Not $RdpFilePath) {
-    Write-Host "Bitte eine RDP-Datei angeben." -ForegroundColor Red
+    Write-Verbose "Bitte eine RDP-Datei angeben." -ForegroundColor Red
     return
 }
 
 # Überprüfen, ob die angegebene RDP-Datei existiert
 if (-Not (Test-Path $RdpFilePath)) {
-    Write-Host "Die angegebene Datei wurde nicht gefunden: $RdpFilePath" -ForegroundColor Red
+    Write-Verbose "Die angegebene Datei wurde nicht gefunden: $RdpFilePath" -ForegroundColor Red
     return
 }
 
@@ -36,7 +36,7 @@ function Load-RdpFile {
 
     # Überprüfen, ob die Datei existiert
     if (-Not (Test-Path $FilePath)) {
-        Write-Host "Die Datei wurde nicht gefunden: $FilePath" -ForegroundColor Red
+        Write-Verbose "Die Datei wurde nicht gefunden: $FilePath" -ForegroundColor Red
         return $null
     }
 
@@ -241,15 +241,19 @@ foreach ($key in $defaultSettings.Keys) {
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "" + @{
         "use multimon:i" = "Verwende mehrere Monitore"
+        "screenResolutions:i" = "Bildschirmgrösse"
         "audiocapturemode:i" = "Aktiviere Audioaufnahme"
         "redirectclipboard:i" = "Leite Zwischenablage um"
-        "redirectdrives:i" = "Leite lokale Laufwerke um"
         "redirectprinters:i" = "Leite Drucker um"
         "dynamic resolution:i" = "Aktiviere dynamische Auflösung"
         "screen mode id:i" = "Setze Bildschirmmodus (1=Fenter)"
     }[$key]
     $label.Location = New-Object System.Drawing.Point(10, $y)
-    $label.Size = New-Object System.Drawing.Size(250, 20)
+    $label.Font = [System.Drawing.SystemFonts]::DefaultFont
+    # Measure the size of the text in the label
+    $labelSize = [System.Windows.Forms.TextRenderer]::MeasureText($label.Text, $label.Font)
+    # Set the size of the label based on the measured size
+    $label.Size = New-Object System.Drawing.Size(($labelSize.Width + 20), ($labelSize.Height +5))
     $form.Controls.Add($label)
 
     if ($key -eq "screen mode id:i") {
@@ -304,7 +308,11 @@ foreach ($key in $defaultSettings.Keys) {
         $textBox = New-Object System.Windows.Forms.TextBox
         $textBox.Text = if ($settings[$key] -ne $null) { $settings[$key] } else { $defaultSettings[$key] }
         $textBox.Location = New-Object System.Drawing.Point(270, $y)
-        $textBox.Size = New-Object System.Drawing.Size(300, 20)
+        $textBox.Font = [System.Drawing.SystemFonts]::DefaultFont
+        # Measure the size of the text in the label
+        $labelSize = [System.Windows.Forms.TextRenderer]::MeasureText($textBox.Text, $textBox.Font)
+        # Set the size of the label based on the measured size
+        $textBox.Size = New-Object System.Drawing.Size(($labelSize.Width + 20), ($labelSize.Height +5))
         $form.Controls.Add($textBox)
 
         $controls[$key] = $textBox
@@ -326,6 +334,12 @@ $RdpFilePath1 = Join-Path -Path $tempDirectory -ChildPath $tempFileName
 $saveRegistryButton = New-Object System.Windows.Forms.Button
 $saveRegistryButton.Text = "In Registry speichern"
 $saveRegistryButton.Location = New-Object System.Drawing.Point(10, $y)
+$saveRegistryButton.Font = [System.Drawing.SystemFonts]::DefaultFont
+# Measure the size of the text in the label
+$labelSize = [System.Windows.Forms.TextRenderer]::MeasureText($saveRegistryButton.Text, $saveRegistryButton.Font)
+# Set the size of the label based on the measured size
+$saveRegistryButton.Size = New-Object System.Drawing.Size(($labelSize.Width + 20), ($labelSize.Height +5))
+
 $saveRegistryButton.Add_Click({
 
     $regsettings = get-settings-from-gui($controls)
@@ -339,6 +353,12 @@ $form.Controls.Add($saveRegistryButton)
 $applyRegistryButton = New-Object System.Windows.Forms.Button
 $applyRegistryButton.Text = "Aus Registry anwenden"
 $applyRegistryButton.Location = New-Object System.Drawing.Point(150, $y)
+$applyRegistryButton.Font = [System.Drawing.SystemFonts]::DefaultFont
+# Measure the size of the text in the label
+$labelSize = [System.Windows.Forms.TextRenderer]::MeasureText($applyRegistryButton.Text, $applyRegistryButton.Font)
+# Set the size of the label based on the measured size
+$applyRegistryButton.Size = New-Object System.Drawing.Size(($labelSize.Width + 20), ($labelSize.Height +5))
+
 $applyRegistryButton.Add_Click({
     $registrySettings = Load-ConfigFromRegistry
     if ($registrySettings.Count -gt 0) {

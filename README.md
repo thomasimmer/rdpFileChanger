@@ -37,12 +37,6 @@ Dieses Tool ermöglicht die einfache Bearbeitung von RDP-Dateien über eine graf
    - **Aus Registry anwenden:** Lädt die gespeicherte Konfiguration aus der Registry und wendet sie an.
    - **Starten:** Speichert die Einstellungen und startet die RDP-Verbindung.
   
-   
-## Script
-```powershell
-# Das vollständige Skript ist im Abschnitt "Aktuelles Skript" enthalten.
-```
-
 ## Exe erstellen
 ### 1. Script signieren
 1. Erstellen Sie ein selbstsigniertes Zertifikat:

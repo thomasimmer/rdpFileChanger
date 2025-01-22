@@ -1,12 +1,14 @@
 # This script provides a graphical user interface (GUI) to modify and save RDP (Remote Desktop Protocol) file settings.
 # It allows users to load an RDP file, adjust settings, save the updated file, and store/load configurations from the Windows registry.
 # To convert this script to an executable, use a tool like `ps2exe`:
-# Example: ps2exe.ps1 -inputFile rdptool.ps1 -outputFile rdptool.exe -noConsole
+# Example: ps2exe.ps1 -inputFile rdptool.ps1 -outputFile C:\Data\Tools\rdpFileChanger\rdptool.exe -noConsole
 
 # Pfad zur RDP-Datei aus Argumenten
 param (
     [string]$RdpFilePath
 )
+
+
 
 # Benötigte PowerShell-Version
 #requires -Version 5.1
@@ -14,6 +16,7 @@ param (
 # Einbinden von .NET Assemblies für GUI-Komponenten
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+
 
 # Initialisieren des HashTables für Registry-Einstellungen
 $regsettings = @{}
@@ -155,10 +158,15 @@ $settings = @{}
                 $settings[$key] = "0"
             }
         } elseif ($key -eq "screenResolutions:i") {
-            $settings[$key] =  $resolutionComboBox.SelectedItem 
-            $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
-            $settings["desktopwidth:i"] = $selectedResolution[0]
-            $settings["desktopheight:i"] = $selectedResolution[1]
+            foreach ($radioButton in $controls1["screenResolutions:i"].Controls) {
+                if ($radioButton.Checked) {
+#                    $settings[$key] = $radioButton.Text
+                    $selectedResolution = $radioButton.Text -split "x"
+                    $settings["desktopwidth:i"] = $selectedResolution[0]
+                    $settings["desktopheight:i"] = $selectedResolution[1]
+                    break
+                }
+            }
         } elseif ($key -eq "desktopwidth:i") {
         } elseif ($key -eq "desktopheight:i") {
         } else {
@@ -173,18 +181,21 @@ $settings = @{}
 
 
 function set-gui-from-settings {
-    param ([hashtable]$mysettings) 
-
-    $resolutionComboBox.Text = "$($mysettings["desktopwidth:i"])x$($mysettings["desktopheight:i"])"
+    foreach ($radioButton in $controls["screenResolutions:i"].Controls) {
+        if ($radioButton.Text -eq "$($settings["desktopwidth:i"])x$($settings["desktopheight:i"])") {
+            $radioButton.Checked = $true
+            break
+        }
+    }
 
     foreach ($key in $defaultSettings.Keys) {
         if ($controls.ContainsKey($key)) {
             if ($controls.ContainsKey($key)) {
                 if ($controls[$key] -is [System.Collections.Hashtable]) {
-                    $controls[$key].Yes.Checked = ($mysettings[$key] -eq "1")
-                    $controls[$key].No.Checked = ($mysettings[$key] -eq "0")
+                    $controls[$key].Yes.Checked = ($settings[$key] -eq "1")
+                    $controls[$key].No.Checked = ($settings[$key] -eq "0")
                 } else {
-                    $controls[$key].Text = $mysettings[$key]
+                    $controls[$key].Text = $settings[$key]
                 }
             }
         }
@@ -192,6 +203,9 @@ function set-gui-from-settings {
 
  
 }
+
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
 
 
 # Initiale Einstellungen (Defaults)
@@ -204,7 +218,7 @@ $defaultSettings = @{
     "dynamic resolution:i" = "1"  # Passt die Auflösung dynamisch an
     "desktopwidth:i:" ="1600"  # Setzt die Desktopbreite in Pixeln
     "desktopheight:i:" = "960"  # Setzt die Desktophöhe in Pixeln
-    "screen mode id:i" = "2"  # Setzt den Bildschirmmodus (2 = Vollbild)
+    "screen mode id:i" = "1"  # Setzt den Bildschirmmodus (2 = Vollbild)
 }
 
 # Übliche Bildschirmgrößen (kann im File konfiguriert werden)
@@ -215,7 +229,10 @@ $screenResolutions = @(
     "1440x900",
     "1600x900",
     "1920x1080",
-    "2560x1440",
+    "1920x950",
+    "2560x1400",
+    "2500x1350",
+    "3200x1350",
     "3840x2160"
 )
 
@@ -230,6 +247,7 @@ if (-Not $settings) {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "RDP-Einstellungen anpassen"
 $form.Size = New-Object System.Drawing.Size(600, 500)
+$form.Font = New-Object System.Drawing.Font("Arial Unicode MS", 8.25)
 
 $y = 10
 
@@ -239,7 +257,7 @@ $controls = @{}
 # Hinzufügen der Steuerelemente für die Einstellungen
 foreach ($key in $defaultSettings.Keys) {
     $label = New-Object System.Windows.Forms.Label
-    $label.Text = "" + @{
+    $label.Text = @{
         "use multimon:i" = "Verwende mehrere Monitore"
         "screenResolutions:i" = "Bildschirmgrösse"
         "audiocapturemode:i" = "Aktiviere Audioaufnahme"
@@ -281,7 +299,7 @@ foreach ($key in $defaultSettings.Keys) {
 
         $radioNo = New-Object System.Windows.Forms.RadioButton
         $radioNo.Text = "Nein"
-        $radioNo.Location = New-Object System.Drawing.Point(100, 0)
+        $radioNo.Location = New-Object System.Drawing.Point(110, 0)
         $radioNo.Checked = ($settings[$key] -eq "0") -or ($settings[$key] -eq $null -and $defaultSettings[$key] -eq "0")
         $panel.Controls.Add($radioNo)
 
@@ -289,18 +307,32 @@ foreach ($key in $defaultSettings.Keys) {
             "Yes" = $radioYes
             "No" = $radioNo
         }
-    } elseif ($key -eq "screenResolutions:i") {
-        # Verwenden eines ComboBox für Bildschirmauflösungen
-        $resolutionComboBox = New-Object System.Windows.Forms.ComboBox
-        $resolutionComboBox.Location = New-Object System.Drawing.Point(270, $y)
-        $resolutionComboBox.Size = New-Object System.Drawing.Size(300, 20)
-        $resolutionComboBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-        $resolutionComboBox.Items.AddRange($screenResolutions)
-        $resolutionComboBox.SelectedItem = "$($settings["desktopwidth:i:"])x$($settings["desktopheight:i:"])"
-        $form.Controls.Add($resolutionComboBox)    
-        $controls[$key] = $resolutionComboBox
-    
-    }  elseif ($key -eq "desktopwidth:i:" -or $key -eq "desktopheight:i:" ) {
+        } elseif ($key -eq "screenResolutions:i") {
+        # Verwenden eines Panels für Bildschirmauflösungen
+        $resolutionPanel = New-Object System.Windows.Forms.Panel
+        $resolutionPanel.Location = New-Object System.Drawing.Point(270, $y)
+        $resolutionPanel.Size = New-Object System.Drawing.Size(300, 100)
+        $form.Controls.Add($resolutionPanel)
+
+        $columnCount = 3
+        $columnWidth = 110
+        $rowHeight = 20
+        $index = 0
+        $y += 50
+
+
+        foreach ($resolution in $screenResolutions) {
+            $radioResolution = New-Object System.Windows.Forms.RadioButton
+            $radioResolution.Text = $resolution
+            $radioResolution.Location = New-Object System.Drawing.Point((($index % $columnCount) * $columnWidth), ([math]::Floor($index / $columnCount) * $rowHeight))
+            $radioResolution.Checked = ($resolution -eq "$($settings["desktopwidth:i"])x$($settings["desktopheight:i"])")
+            $resolutionPanel.Controls.Add($radioResolution)
+            $index++
+        }
+
+        $controls[$key] = $resolutionPanel
+        
+        }  elseif ($key -eq "desktopwidth:i:" -or $key -eq "desktopheight:i:" ) {
         # Skip width and height for now, add combo box later
         
     } else {
@@ -396,29 +428,8 @@ $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Starten"
 $startButton.Location = New-Object System.Drawing.Point(100, $y)
 $startButton.Add_Click({
-#    foreach ($key in $controls.Keys) {
-#        if ($controls[$key] -is [System.Collections.Hashtable]) {
-#            # Handle binary values
-#            if ($controls[$key].Yes.Checked) {
-#                $settings[$key] = "1"
-#            } elseif ($controls[$key].No.Checked) {
-#                $settings[$key] = "0"
-#            }
-#        } else {
-#            # Handle non-binary values
-#            $settings[$key] = $controls[$key].Text
-##        }
-#    }
 
-    
-
-#    $selectedResolution = $resolutionComboBox.SelectedItem -split "x"
-#    $settings["desktopwidth:i"] = $selectedResolution[0]
-#    $settings["desktopheight:i"] = $selectedResolution[1]
-
-$settings = @{}
-
-
+    $settings = @{}
     $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings

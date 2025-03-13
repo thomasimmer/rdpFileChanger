@@ -103,6 +103,52 @@ function Save-RdpFile {
     Set-Content -Path $FilePath1 -Value $updatedContent -Force
 }
 
+function Show-TextFileDialog {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        
+        [string]$DialogTitle = "Ich bin nur ein Textfile nichts Besonderes"
+    )
+
+    if (-not (Test-Path $FilePath)) {
+        throw "Datei '$FilePath' existiert nicht. Surprise!"
+    }
+
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $content = Get-Content -Path $FilePath -Raw
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = $DialogTitle
+    $form.Width = 800
+    $form.Height = 600
+    $form.StartPosition = "CenterScreen"
+
+    $textBox = New-Object System.Windows.Forms.TextBox
+    $textBox.Multiline = $true
+    $textBox.ScrollBars = "Both"
+    $textBox.Dock = "Fill"
+    $textBox.ReadOnly = $true
+    $textBox.Font = New-Object System.Drawing.Font("Consolas", 10)
+    $textBox.Text = $content
+
+    $form.Controls.Add($textBox)
+
+    # Weil jedes Fenster einen OK-Button braucht, sonst klickt der User wild herum...
+    $buttonOK = New-Object System.Windows.Forms.Button
+    $buttonOK.Text = "OK, hab's gelesen (oder zumindest so getan)"
+    $buttonOK.Dock = "Bottom"
+    $buttonOK.Height = 40
+    $buttonOK.Add_Click({ $form.Close() })
+
+    $form.Controls.Add($buttonOK)
+
+    $form.Topmost = $true
+    $form.Add_Shown({$form.Activate()})
+    [void]$form.ShowDialog()
+}
+
 # Funktion zum Speichern der Konfiguration in der Registry
 function Save-ConfigToRegistry {
     param ([hashtable]$Settings)
@@ -423,18 +469,36 @@ $saveButton.Add_Click({
 
 $form.Controls.Add($saveButton)
 
+# Hinzufügen des Buttons zum Speichern der Einstellungen
+$showButton = New-Object System.Windows.Forms.Button
+$showButton.Text = "Anzeigen"
+$showButton.Location = New-Object System.Drawing.Point(100, $y)
+$showButton.Add_Click({
+
+    $settings = get-settings-from-gui($controls)
+
+    Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
+    Show-TextFileDialog -FilePath $RdpFilePath1
+    # [System.Windows.Forms.MessageBox]::Show("Einstellungen gespeichert!", "Erfolg")
+
+})
+
+$form.Controls.Add($showButton)
+
+
 # Hinzufügen des Buttons zum Starten der RDP-Verbindung
 $startButton = New-Object System.Windows.Forms.Button
 $startButton.Text = "Starten"
-$startButton.Location = New-Object System.Drawing.Point(100, $y)
+$startButton.Location = New-Object System.Drawing.Point(200, $y)
 $startButton.Add_Click({
 
     $settings = @{}
     $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
-    Start-Process -FilePath "mstsc.exe" -ArgumentList $RdpFilePath1
-    # [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet!", "Erfolg")
+    [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet: $RdpFilePath1", "")
+    
+    Start-Process -FilePath "mstsc.exe" -ArgumentList """$RdpFilePath1"""
     $form.Close()
 })
 $form.Controls.Add($startButton)

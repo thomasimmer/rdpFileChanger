@@ -23,15 +23,42 @@ $regsettings = @{}
 
 # Überprüfen, ob der Pfad zur RDP-Datei angegeben wurde
 if (-Not $RdpFilePath) {
-    Write-Verbose "Bitte eine RDP-Datei angeben." -ForegroundColor Red
+    Write-Verbose "Bitte eine RDP-Datei angeben." 
     return
 }
 
 # Überprüfen, ob die angegebene RDP-Datei existiert
 if (-Not (Test-Path $RdpFilePath)) {
-    Write-Verbose "Die angegebene Datei wurde nicht gefunden: $RdpFilePath" -ForegroundColor Red
+    Write-Verbose "Die angegebene Datei wurde nicht gefunden: $RdpFilePath" 
     return
 }
+
+# Beispiel-Funktion zum Setzen eines Registry-Werts für eine Option
+function Set-RegistryOption {
+    param (
+        [string]$key,
+        [string]$name,
+        [string]$value
+    )
+    $regPath = "HKCU:\Software\RDPTool\Settings"
+    if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    Set-ItemProperty -Path $regPath -Name "$key-$name" -Value $value -Force
+}
+
+# Beispiel-Funktion zum Lesen eines Registry-Werts
+function Get-RegistryOption {
+    param (
+        [string]$key,
+        [string]$name
+    )
+    $regPath = "HKCU:\Software\RDPTool\Settings"
+    if (Test-Path "$regPath") {
+        return (Get-ItemProperty -Path "$regPath" -Name "$key-$name" -ErrorAction SilentlyContinue)."$key-$name"
+    } else {
+        return $null
+    }
+}
+
 
 # Funktion zum Laden der .rdp-Datei
 function Load-RdpFile {
@@ -77,7 +104,9 @@ function Save-RdpFile {
             $value1 = $matches.value1
             if ($defaultSettings.ContainsKey($key+":"+$value1)) {
                 if ($Settings.ContainsKey($key+":"+$value1)) {
-                    $updatedContent += "$($key):$($value1):$($Settings[$key+":"+$value1])"
+                    if (($Settings[$key+":"+$value1] -ne "2") -and ($Settings[$key+":"+$value1] -ne "Nicht Konfigurieren")) {
+                        $updatedContent += "$($key):$($value1):$($Settings[$key+":"+$value1])"
+                    }
                     $updatedKeys[$key+":"+$value1] = $true
                 } else {
                     $updatedContent += $line
@@ -95,7 +124,9 @@ function Save-RdpFile {
     # Hinzufügen neuer Einstellungen, die noch nicht im Datei-Inhalt sind
     foreach ($key in $Settings.Keys) {
         if (-Not $updatedKeys.ContainsKey($key)) {
-            $updatedContent += "$($key):$($Settings[$key])"
+            if (($Settings[$key] -ne "2") -and ($Settings[$key] -ne "Nicht Konfigurieren"))  {
+                $updatedContent += "$($key):$($Settings[$key])"
+            }
         }
     }
 
@@ -200,6 +231,8 @@ $settings = @{}
             # Handle binary values
             if ($controls1[$key].Yes.Checked) {
                 $settings[$key] = "1"
+            } elseif ($controls1[$key].NC.Checked) {
+                $settings[$key] = "2"
             } elseif ($controls1[$key].No.Checked) {
                 $settings[$key] = "0"
             }
@@ -228,17 +261,21 @@ $settings = @{}
 
 function set-gui-from-settings {
     foreach ($radioButton in $controls["screenResolutions:i"].Controls) {
-        if ($radioButton.Text -eq "$($settings["desktopwidth:i"])x$($settings["desktopheight:i"])") {
-            $radioButton.Checked = $true
+        if (($radioButton.Text -eq "Nicht Konfigurieren") -and ("Nicht Konfigurieren") -eq "$($settings["desktopwidth:i"])") {
+                $radioButton.Checked = $true
+            break
+        } elseif ($radioButton.Text -eq "$($settings["desktopwidth:i"])x$($settings["desktopheight:i"])") {
+                $radioButton.Checked = $true
             break
         }
     }
-
+    
     foreach ($key in $defaultSettings.Keys) {
         if ($controls.ContainsKey($key)) {
             if ($controls.ContainsKey($key)) {
                 if ($controls[$key] -is [System.Collections.Hashtable]) {
                     $controls[$key].Yes.Checked = ($settings[$key] -eq "1")
+                    $controls[$key].NC.Checked = ($settings[$key] -eq "2")
                     $controls[$key].No.Checked = ($settings[$key] -eq "0")
                 } else {
                     $controls[$key].Text = $settings[$key]
@@ -256,12 +293,12 @@ function set-gui-from-settings {
 
 # Initiale Einstellungen (Defaults)
 $defaultSettings = @{
-    "use multimon:i" = "0"  # Ermöglicht die Verwendung mehrerer Monitore
+    "use multimon:i" = "2"  # Ermöglicht die Verwendung mehrerer Monitore
     "screenResolutions:i" = "1600x768"
-    "audiocapturemode:i" = "1"  # Aktiviert die Audiowiedergabe auf dem Client
-    "redirectclipboard:i" = "1"  # Ermöglicht das Umleiten der Zwischenablage
-    "redirectprinters:i" = "1"  # Aktiviert die Druckerumleitung
-    "dynamic resolution:i" = "1"  # Passt die Auflösung dynamisch an
+    "audiocapturemode:i" = "2"  # Aktiviert die Audiowiedergabe auf dem Client
+    "redirectclipboard:i" = "2"  # Ermöglicht das Umleiten der Zwischenablage
+    "redirectprinters:i" = "2"  # Aktiviert die Druckerumleitung
+    "dynamic resolution:i" = "2"  # Passt die Auflösung dynamisch an
     "desktopwidth:i:" ="1600"  # Setzt die Desktopbreite in Pixeln
     "desktopheight:i:" = "960"  # Setzt die Desktophöhe in Pixeln
     "screen mode id:i" = "1"  # Setzt den Bildschirmmodus (2 = Vollbild)
@@ -269,6 +306,7 @@ $defaultSettings = @{
 
 # Übliche Bildschirmgrößen (kann im File konfiguriert werden)
 $screenResolutions = @(
+    "Nicht Konfigurieren",
     "1024x768",
     "1280x800",
     "1366x768",
@@ -320,6 +358,9 @@ foreach ($key in $defaultSettings.Keys) {
     $label.Size = New-Object System.Drawing.Size(($labelSize.Width + 20), ($labelSize.Height +5))
     $form.Controls.Add($label)
 
+
+   
+
     if ($key -eq "screen mode id:i") {
         # Verwenden eines TextBox für nicht-binäre Werte
         $textBox = New-Object System.Windows.Forms.TextBox
@@ -330,26 +371,35 @@ foreach ($key in $defaultSettings.Keys) {
 
         $controls[$key] = $textBox
 
-    } elseif ($defaultSettings[$key] -match "^[01]$") {
+    } elseif ($defaultSettings[$key] -match "^[012]$") {
         # Verwenden von Radiobuttons für binäre Werte
         $panel = New-Object System.Windows.Forms.Panel
         $panel.Location = New-Object System.Drawing.Point(270, $y)
         $panel.Size = New-Object System.Drawing.Size(300, 30)
         $form.Controls.Add($panel)
 
-        $radioYes = New-Object System.Windows.Forms.RadioButton
-        $radioYes.Text = "Ja"
-        $radioYes.Location = New-Object System.Drawing.Point(0, 0)
-        $radioYes.Checked = ($settings[$key] -eq "1") -or ($settings[$key] -eq $null -and $defaultSettings[$key] -eq "1")
-        $panel.Controls.Add($radioYes)
-
         $radioNo = New-Object System.Windows.Forms.RadioButton
         $radioNo.Text = "Nein"
-        $radioNo.Location = New-Object System.Drawing.Point(110, 0)
+        $radioNo.Location = New-Object System.Drawing.Point(110, 5)
         $radioNo.Checked = ($settings[$key] -eq "0") -or ($settings[$key] -eq $null -and $defaultSettings[$key] -eq "0")
         $panel.Controls.Add($radioNo)
 
+        $radioYes = New-Object System.Windows.Forms.RadioButton
+        $radioYes.Text = "Ja"
+        $radioYes.Location = New-Object System.Drawing.Point(55, 5)
+        $radioYes.Checked = ($settings[$key] -eq "1") -or ($settings[$key] -eq $null -and $defaultSettings[$key] -eq "1")
+        $panel.Controls.Add($radioYes)
+
+        $radioNC = New-Object System.Windows.Forms.RadioButton
+        $radioNC.Text = "NC"
+        $radioNC.Location = New-Object System.Drawing.Point(0, 5)
+        $radioNC.Checked = ($settings[$key] -eq "2") -or ($settings[$key] -eq $null -and $defaultSettings[$key] -eq "2")
+        $panel.Controls.Add($radioNC)
+
+
+
         $controls[$key] = @{
+            "NC" = $radioNC
             "Yes" = $radioYes
             "No" = $radioNo
         }
@@ -400,8 +450,6 @@ foreach ($key in $defaultSettings.Keys) {
 }
 
 $y += 40
-
-$insertText = "user_"
 
 # System-Temp-Verzeichnis und Dateiname festlegen
 $tempDirectory = [System.IO.Path]::GetTempPath()
@@ -496,7 +544,7 @@ $startButton.Add_Click({
     $settings = get-settings-from-gui($controls)
 
     Save-RdpFile -FilePath $RdpFilePath -FilePath1 $RdpFilePath1 -Settings $settings
-    [System.Windows.Forms.MessageBox]::Show("Verbindung gestartet: $RdpFilePath1", "")
+    #[System.Windows.Forms.MessageBox]::Show("Verbindung gestartet: $RdpFilePath1", "")
     
     Start-Process -FilePath "mstsc.exe" -ArgumentList """$RdpFilePath1"""
     $form.Close()
